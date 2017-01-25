@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+refname="$1"
+oldrev="$2"
+newrev="$3"
+
+# only check commits made after this date
+checkfromdate="2017-01-24"
+zero="0000000000000000000000000000000000000000"
+
+# only run this on feature branches
+if [ $refname == "master" ]; then
+  exit 0
+fi
+
+# ignore deletion of branches
+if [ $newrev == $zero ]
+  exit 0
+fi
+
+if [ $oldrev == $zero ]
+  $oldrev=$(git merge-base $newrev refs/heads/master)
+fi
+
+# get the commits to check
+commits=$(git rev-list --since=$checkfromdate $oldrev..$newrev)
+for commit in $commits; do
+	message=$(git log -1 --format="%s")
+	if [ $message =~ /Mergng\ branch\ *./master  ]
+      echo "Back merges are a bad practice. If this needs to be over ridden, change the commit message."
+	  echo "More information here: https://github.com/Adaptech/developer-guidelines#abstain-from-back-merges"
+	  exit 1
+	fi
+done
+
+exit 0
