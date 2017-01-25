@@ -7,6 +7,8 @@ Developer guidelines for best results
 
 If you want to do continuous integration, do that in a designated branch like `integration`. Do not use `git merge master` or an other higher order branch to update a WIP (work in progress) branch.
 
+The hook that can prevent accidental pushes of back-merges can be found [here](https://raw.githubusercontent.com/Adaptech/developer-guidelines/master/updatehook).
+
 You can keep your work in sync with the master or other higher order branch like this:
 
 #### Rebase
