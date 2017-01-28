@@ -1,36 +1,71 @@
-#!/bin/sh
-#
-refname="$1"
-oldrev="$2"
-newrev="$3"
+#!/bin/bash
+
+# hook to make sure back merges are not accidentally added
+
+ref_name="$1"
+old_rev="$2"
+new_rev="$3"
+
+#echo "ref_name: ${ref_name}"
+#echo "old_rev: ${old_rev}"
+#echo "new_rev: ${new_rev}"
 
 # only check commits made after this date
-checkfromdate="2017-01-24"
+check_from_date="2017-01-27"
 zero="0000000000000000000000000000000000000000"
+back_merge_regex="Merge (remote-tracking )?branch '(.*/)?master' into"
 
-# only run this on feature branches
-if [ $refname == "master" ]; then
+#branch \'*./master\'"
+#echo "only run on feature branches. Checking if master is pushed."
+if [ "${ref_name}" == "refs/heads/master" ]; then
+  echo "No need to check for back-merges. Pushing master."
   exit 0
 fi
 
 # ignore deletion of branches
-if [ $newrev == $zero ]
+if [ "${new_rev}" == "${zero}" ]; then
+  echo "No need to check for back-merges. Deleting branch."
   exit 0
 fi
 
-if [ $oldrev == $zero ]
-  $oldrev=$(git merge-base $newrev refs/heads/master)
+#echo "checking ${ref_name}"
+# if it's a new branch use the merge base for the range to check
+if [ "${old_rev}" == "${zero}" ]; then
+  old_rev=$(git merge-base ${new_rev} refs/heads/master)
 fi
 
+#echo "checking if force pushed to older commit"
+if git merge-base --is-ancestor ${new_rev} ${old_rev}; then
+  echo "Force pushed to erase some commits. No need to check anything."
+  exit 0
+fi
+
+#echo "checking if force pushed new commits"
+if ! git merge-base --is-ancestor ${old_rev} ${new_rev}; then
+  echo "Force pushed new commits. Need to check all commits to branch point."
+  old_rev=$(git merge-base ${new_rev} refs/heads/master)
+#  echo "old_ref is now: $old_rev"
+fi
+
+#echo "grabbing commit references to check"
 # get the commits to check
-commits=$(git rev-list --since=$checkfromdate $oldrev..$newrev)
-for commit in $commits; do
-	message=$(git log -1 --format="%s")
-	if [ $message =~ /Mergng\ branch\ *./master  ]
-      echo "Back merges are a bad practice. If this needs to be over ridden, change the commit message."
-	  echo "More information here: https://github.com/Adaptech/developer-guidelines#abstain-from-back-merges"
-	  exit 1
-	fi
+commits=$(git rev-list --since=${check_from_date} ${old_rev}..${new_rev})
+#echo "will check the following commits for this pattern '${back_merge_regex}'"
+#echo ${commits}
+for commit in ${commits}; do
+#  echo "inspecting commit ${commit}"
+  message=$(git log -1 --format="%s" ${commit})
+#  echo "this is the commit message: ${message}"
+  if [[ "${message}" =~ $back_merge_regex ]]; then
+    echo "****"
+    echo "**** Back merges are a bad practice. If this needs to be overridden, change the commit message."
+    echo "****"
+    echo "**** $commit $message"
+    echo "****"
+    echo "**** More information here: https://github.com/Adaptech/developer-guidelines#abstain-from-back-merges "
+    echo "****"
+    exit 1
+  fi
 done
 
 exit 0
